@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>Mid Objective — Pending Review</h1>
+    <p>Approve or reject bulk-imported objective questions before they go live.</p>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="flash-msg">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if pending %}
+  <form action="{{ url_for('mid_obj_approve_all') }}" method="POST" style="margin-bottom:16px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-approve">✓ Approve All ({{ pending|length }})</button>
+  </form>
+  {% endif %}
+
+  {% if not pending %}
+    <div class="card" style="padding:24px;text-align:center;color:#7f8c8d;">No pending questions.</div>
+  {% else %}
+    {% for q in pending %}
+    <div class="card" style="margin-bottom:14px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div style="flex:1;">
+          <span class="badge-pill" style="background:{% if q.question_type=='mcq' %}#3498db{% else %}#8e44ad{% endif %};color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;text-transform:uppercase;">
+            {{ q.question_type }}
+          </span>
+          <span style="font-size:0.8rem;color:#7f8c8d;margin-left:8px;">Unit {{ q.unit.unit_number }} · {{ q.bloom_level }}</span>
+          <p style="margin:8px 0 4px;font-weight:500;">{{ q.question_text }}</p>
+          {% if q.question_type == 'mcq' %}
+            <div style="font-size:0.85rem;color:#555;">
+              (A) {{ q.option_a }} &nbsp;|&nbsp;
+              (B) {{ q.option_b }} &nbsp;|&nbsp;
+              (C) {{ q.option_c }} &nbsp;|&nbsp;
+              (D) {{ q.option_d }}
+            </div>
+            <div style="margin-top:4px;font-size:0.85rem;color:#27ae60;font-weight:600;">Correct: {{ q.correct_answer }}</div>
+          {% else %}
+            <div style="margin-top:4px;font-size:0.85rem;color:#27ae60;font-weight:600;">Answer: {{ q.answer_text }}</div>
+          {% endif %}
+          <div style="font-size:0.78rem;color:#aaa;margin-top:4px;">Subject: {{ q.subject.subject_name }} ({{ q.subject.subject_code }})</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <form action="{{ url_for('mid_obj_approve', qid=q.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-approve btn-sm">✓ Approve</button>
+          </form>
+          <form action="{{ url_for('mid_obj_reject', qid=q.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-reject btn-sm">✗ Reject</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<style>
+.page-wrapper { max-width: 960px; margin: 0 auto; padding: 36px 24px 60px; }
+.page-header { margin-bottom: 24px; }
+.page-header h1 { margin: 0 0 6px; font-size: 1.7rem; color: #1a2530; }
+.page-header p { margin: 0; color: #7f8c8d; }
+.card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.flash-msg { background:#eaf4fb; border-left:4px solid #3498db; padding:10px 14px; margin-bottom:12px; border-radius:4px; }
+.btn-approve { background:#27ae60; color:#fff; border:none; padding:7px 16px; border-radius:6px; cursor:pointer; font-weight:600; }
+.btn-approve:hover { background:#219150; }
+.btn-reject { background:#e74c3c; color:#fff; border:none; padding:7px 16px; border-radius:6px; cursor:pointer; font-weight:600; }
+.btn-reject:hover { background:#c0392b; }
+.btn-sm { padding:4px 12px; font-size:0.85rem; }
+</style>
+{% endblock %}

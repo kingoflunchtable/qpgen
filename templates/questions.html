@@ -1,0 +1,1050 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
+<div class="page-wrapper">
+
+
+  <div class="page-header">
+
+    <h1>Question Bank</h1>
+
+    <p>Add, review, and manage the pool of questions used by the exam generator.</p>
+
+  </div>
+
+
+  <!-- ── Stats bar ── -->
+
+  <div class="stats-bar">
+
+    <div class="stat-chip">
+
+      <span class="stat-num">{{ part_a_count }}</span>
+
+      <span class="stat-lbl">Part-A questions live</span>
+
+    </div>
+
+    <div class="stat-divider"></div>
+
+    <div class="stat-chip">
+
+      <span class="stat-num">{{ group_count }}</span>
+
+      <span class="stat-lbl">Part-B groups live</span>
+
+    </div>
+
+    <div class="stat-divider"></div>
+
+    <div class="stat-chip">
+
+      <span class="stat-num">{{ mid_obj_count }}</span>
+
+      <span class="stat-lbl">Mid objective questions</span>
+
+    </div>
+
+    {% if pending %}
+
+    <div class="stat-divider"></div>
+
+    <div class="stat-chip pending">
+
+      <span class="stat-num">{{ pending|length }}</span>
+
+      <span class="stat-lbl">awaiting review</span>
+
+    </div>
+
+    {% endif %}
+
+    <a href="/important-questions" class="stat-link">Browse by subject →</a>
+
+  </div>
+
+
+  <!-- ── Flash messages ── -->
+
+  {% with messages = get_flashed_messages() %}
+
+    {% if messages %}
+
+      {% for msg in messages %}
+
+      <div class="flash-msg">{{ msg }}</div>
+
+      {% endfor %}
+
+    {% endif %}
+
+  {% endwith %}
+
+
+  <!-- ── Tabs ── -->
+
+  <div class="tab-bar" style="margin-top:24px;">
+
+    <button class="tab-btn active" onclick="showTab('sem-tab', this)">Semester Questions</button>
+
+    <button class="tab-btn" onclick="showTab('mid-obj-tab', this)">Mid Objective (MCQ/FIB)</button>
+
+    <button class="tab-btn" onclick="showTab('assign-tab', this)">Assignment Questions</button>
+
+
+  </div>
+
+
+  <!-- ══ TAB 1: Semester bulk add ══ -->
+
+  <div id="sem-tab" class="tab-content">
+
+  <div class="card" style="margin-top:16px;">
+
+    <div class="card-header">
+
+      <div class="card-icon">＋</div>
+
+      <div>
+
+        <h2 class="card-title">Add Semester Questions</h2>
+
+        <p class="card-subtitle">Paste questions — goes into review queue before live bank.</p>
+
+      </div>
+
+    </div>
+
+
+    <details class="format-guide">
+
+      <summary>Show paste format &amp; example</summary>
+
+      <div class="format-body">
+
+        <pre id="format-example">[PART-A]
+
+Define an algorithm. | Remember
+
+What is recursion? | Understand
+
+
+[PART-B-SINGLE]
+
+Write a program to sum an array. | 10 | Apply | Medium
+
+
+[PART-B-COMPOUND]
+
+Explain pointer arithmetic. | 5 | Understand | Easy
+
+Differentiate malloc and calloc. | 5 | Understand | Easy</pre>
+
+        <p id="multi-unit-hint" class="hint" style="display:none;">
+
+          Add a <code>[UNIT:N]</code> line before each unit's questions to paste a whole subject at once.
+
+        </p>
+
+      </div>
+
+    </details>
+
+
+    <label class="toggle-row">
+
+      <input type="checkbox" id="multi_unit_toggle">
+
+      <span>Paste questions for <strong>all units</strong> at once (use <code>[UNIT:N]</code> markers)</span>
+
+    </label>
+
+
+    <form action="/questions/bulk-add" method="POST" style="margin-top:20px;">
+
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+
+        <div class="field-group" style="position:relative;">
+
+          <label class="field-label">Subject</label>
+
+          <input type="text" id="bulk_subject_search" autocomplete="off" required placeholder="Type a subject name or code…" class="field-input">
+
+          <input type="hidden" id="bulk_subject_id" name="subject_id">
+
+          <div id="bulk_subject_results" class="dropdown-results"></div>
+
+        </div>
+
+        <div id="bulk_unit_field" class="field-group">
+
+          <label class="field-label">Unit</label>
+
+          <select id="bulk_unit_id" name="unit_id" required class="field-select">
+
+            <option value="" disabled selected>Select a subject first</option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+      <div class="field-group" style="margin-top:16px;">
+
+        <label class="field-label">Paste questions</label>
+
+        <textarea id="bulk_text" name="bulk_text" required rows="10" class="field-textarea"
+
+          placeholder="[PART-A]&#10;Define an algorithm. | Remember&#10;&#10;[PART-B-SINGLE]&#10;Write a program to sum an array. | 10 | Apply | Medium"></textarea>
+
+      </div>
+
+      <div class="form-footer" style="margin-top:16px;">
+
+        <button type="submit" class="btn-primary">Import for Review</button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+  </div>
+
+
+  <!-- ══ TAB 2: Mid Objective bulk add ══ -->
+
+  <div id="mid-obj-tab" class="tab-content" style="display:none;">
+
+  <div class="card" style="margin-top:16px;">
+
+    <div class="card-header">
+
+      <div class="card-icon">🎯</div>
+
+      <div>
+
+        <h2 class="card-title">Add Mid Objective Questions (MCQ / Fill-in-Blank)</h2>
+
+        <p class="card-subtitle">Direct import — goes straight to mid question bank (no review queue).</p>
+
+      </div>
+
+    </div>
+
+
+    <details class="format-guide">
+
+      <summary>Show paste format &amp; example</summary>
+
+      <div class="format-body">
+
+        <pre>[MCQ]
+
+What is the time complexity of binary search? | O(n) | O(log n) | O(n²) | O(1) | B | Understand | 1
+
+Which data structure uses LIFO? | Queue | Stack | Tree | Graph | B | Remember | 2
+
+
+[FIB]
+
+A _______ is a self-referential data structure. | linked list | Remember | 1
+
+Binary search requires the array to be _______. | sorted | Understand | 2</pre>
+
+        <p class="hint">
+
+          MCQ format: <code>question | A | B | C | D | correct_letter | bloom | unit_number</code><br>
+
+          FIB format: <code>question (with blank) | answer | bloom | unit_number</code>
+
+        </p>
+
+      </div>
+
+    </details>
+
+
+    <form action="/questions/mid-bulk-add" method="POST" style="margin-top:20px;"
+          onsubmit="if(!document.getElementById('mid_obj_subject_id').value){alert('Select subject from dropdown first.');return false;}">
+
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+
+        <div class="field-group" style="position:relative;">
+
+          <label class="field-label">Subject</label>
+
+          <input type="text" id="mid_obj_subject_search" autocomplete="off" required placeholder="Type subject name or code…" class="field-input">
+
+          <input type="hidden" id="mid_obj_subject_id" name="subject_id">
+
+          <div id="mid_obj_subject_results" class="dropdown-results"></div>
+
+        </div>
+
+      </div>
+
+      <div class="field-group" style="margin-top:16px;">
+
+        <label class="field-label">Paste questions</label>
+
+        <textarea name="bulk_text" required rows="12" class="field-textarea"
+
+          placeholder="[MCQ]&#10;Question text | A | B | C | D | correct | bloom | unit_no&#10;&#10;[FIB]&#10;Question with ___. | answer | bloom | unit_no"></textarea>
+
+      </div>
+
+      <div class="form-footer" style="margin-top:16px;">
+
+        <button type="submit" class="btn-primary">Import Mid Objectives</button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+  {% if mid_obj_pending %}
+  <div class="card" style="margin-top:24px;">
+    <div class="card-header">
+      <div class="card-icon pending-icon">⏳</div>
+      <div>
+        <h2 class="card-title">Pending Mid Objectives <span class="badge">{{ mid_obj_pending|length }}</span></h2>
+        <p class="card-subtitle">MCQ/FIB awaiting approval. Approve to activate, reject to discard.</p>
+      </div>
+    </div>
+    <div style="margin-bottom:12px; display:flex; gap:8px;">
+      <form action="/questions/mid-objectives/approve-all" method="POST" style="display:inline;"
+            onsubmit="return confirm('Approve all {{ mid_obj_pending|length }} pending mid objective(s)?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-approve">✓ Approve All ({{ mid_obj_pending|length }})</button>
+      </form>
+      <form action="/questions/mid-objectives/reject-all" method="POST" style="display:inline;"
+            onsubmit="return confirm('Reject all? Cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-reject">✗ Reject All</button>
+      </form>
+    </div>
+    <div class="pending-list">
+      {% for q in mid_obj_pending %}
+      <div class="pending-card">
+        <div class="pending-meta">
+          <span class="pending-badge">{{ q.question_type | upper }}</span>
+          <span class="pending-detail">Unit {{ q.unit.unit_number if q.unit else '?' }}</span>
+          <span class="pending-detail">{{ q.subject.subject_code if q.subject else '' }}</span>
+          <span class="pending-detail">{{ q.bloom_level }}</span>
+        </div>
+        <p class="pending-text">{{ q.question_text }}</p>
+        {% if q.question_type == 'mcq' %}
+        <p class="pending-detail">A) {{ q.option_a }} &nbsp; B) {{ q.option_b }} &nbsp; C) {{ q.option_c }} &nbsp; D) {{ q.option_d }} &nbsp; ✓ {{ q.correct_answer }}</p>
+        {% else %}
+        <p class="pending-detail">Answer: <strong>{{ q.answer_text }}</strong></p>
+        {% endif %}
+        <div class="pending-actions">
+          <form action="/questions/mid-objectives/{{ q.id }}/approve" method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-approve btn-sm">✓ Approve</button>
+          </form>
+          <form action="/questions/mid-objectives/{{ q.id }}/reject" method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-reject btn-sm">✗ Reject</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  </div>
+
+
+
+  <!-- ══ TAB 3: Assignment bulk add ══ -->
+
+  <div id="assign-tab" class="tab-content" style="display:none;">
+
+  <div class="card" style="margin-top:16px;">
+
+    <div class="card-header">
+
+      <div class="card-icon">📝</div>
+
+      <div>
+
+        <h2 class="card-title">Bulk Add Assignment Questions</h2>
+
+        <p class="card-subtitle">Direct import — goes straight to assignment question bank.</p>
+
+      </div>
+
+    </div>
+
+
+    <details class="format-guide">
+
+      <summary>Show paste format &amp; example</summary>
+
+      <div class="format-body">
+
+        <pre>[ASSIGN:1][UNIT:2] Design a prototype for smart irrigation | working_prototype | CO2,CO4 | Create | 10
+[ASSIGN:2][UNIT:4] Explain transformer losses and efficiency | descriptive | CO3 | Understand | 10</pre>
+
+        <p class="hint">
+          Format: <code>[ASSIGN:N][UNIT:N] question text | type | CO1,CO2 | bloom | marks</code><br>
+          Types: descriptive, project, seminar, working_prototype, scenario, innovative, case_study, survey, presentation
+        </p>
+
+      </div>
+
+    </details>
+
+
+    <form action="/questions/assignment-bulk-add" method="POST" style="margin-top:20px;"
+          onsubmit="if(!document.getElementById('assign_subject_code').value){alert('Select subject from dropdown first.');return false;}">
+
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+
+        <div class="field-group" style="position:relative;">
+
+          <label class="field-label">Subject</label>
+
+          <input type="text" id="assign_subject_search" autocomplete="off" required placeholder="Type subject name or code…" class="field-input">
+
+          <input type="hidden" id="assign_subject_code" name="subject_code">
+
+          <div id="assign_subject_results" class="dropdown-results"></div>
+
+        </div>
+
+      </div>
+
+      <div class="field-group" style="margin-top:16px;">
+
+        <label class="field-label">Paste questions</label>
+
+        <textarea name="bulk_text" required rows="12" class="field-textarea"
+          placeholder="[ASSIGN:1][UNIT:1] Question text | descriptive | CO1,CO2 | Understand | 10&#10;[ASSIGN:2][UNIT:4] Another question | scenario | CO3 | Analyze | 10"></textarea>
+
+      </div>
+
+      <div class="form-footer" style="margin-top:16px;">
+
+        <button type="submit" class="btn-primary">Import Assignment Questions</button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+  
+  {% if assign_pending %}
+  <div class="card" style="margin-top:24px;">
+    <div class="card-header">
+      <div class="card-icon pending-icon">⏳</div>
+      <div>
+        <h2 class="card-title">Pending Assignment Questions <span class="badge">{{ assign_pending|length }}</span></h2>
+        <p class="card-subtitle">Awaiting approval. Approve to activate, reject to discard.</p>
+      </div>
+    </div>
+    <div style="margin-bottom:12px; display:flex; gap:8px;">
+      <form action="/questions/assignment-pending/approve-all" method="POST" style="display:inline;"
+            onsubmit="return confirm('Approve all {{ assign_pending|length }} question(s)?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-approve">✓ Approve All ({{ assign_pending|length }})</button>
+      </form>
+      <form action="/questions/assignment-pending/reject-all" method="POST" style="display:inline;"
+            onsubmit="return confirm('Reject all? Cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-reject">✗ Reject All</button>
+      </form>
+    </div>
+    <div class="pending-list">
+      {% for q in assign_pending %}
+      <div class="pending-card">
+        <div class="pending-meta">
+          <span class="badge-pill">{{ q.subject.subject_code if q.subject else '—' }}</span>
+          <span class="badge-pill secondary">Unit {{ q.unit.unit_number if q.unit else '?' }}</span>
+          <span class="badge-pill">Assignment {{ q.assignment_number }}</span>
+          <span class="badge-pill pill-b">{{ q.assignment_type }}</span>
+          <span class="badge-pill">{{ q.bloom_level }}</span>
+          {% if q.co_mapping %}<span class="badge-pill pill-a">{{ q.co_mapping }}</span>{% endif %}
+        </div>
+        <p class="pending-text">{{ q.question_text }}</p>
+        <div class="pending-actions">
+          <form action="/questions/assignment-pending/{{ q.id }}/approve" method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-approve btn-sm">✓ Approve</button>
+          </form>
+          <form action="/questions/assignment-pending/{{ q.id }}/reject" method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-reject btn-sm">✗ Reject</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+  <!-- ── Pending queue ── -->
+
+  {% if pending %}
+
+  <div class="card" style="margin-top:24px;">
+
+    <div class="card-header">
+
+      <div class="card-icon pending-icon">⏳</div>
+
+      <div>
+
+        <h2 class="card-title">Pending Review <span class="badge">{{ pending|length }}</span></h2>
+
+        <p class="card-subtitle">Semester questions awaiting approval. Approve to add to live bank, reject to discard.</p>
+
+      </div>
+
+    </div>
+
+
+    {% if not pending %}
+
+    <p style="color:#95a5a6; padding:8px 0;">No questions pending review. Import questions above using "Import for Review".</p>
+
+    {% else %}
+
+    <div class="bulk-actions">
+
+      <form action="/questions/pending/approve-all" method="POST" style="display:inline;"
+
+            onsubmit="return confirm('Approve all {{ pending|length }} pending question(s)?');">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <button type="submit" class="btn-approve">✓ Approve All ({{ pending|length }})</button>
+
+      </form>
+
+      <form action="/questions/pending/reject-all" method="POST" style="display:inline;"
+
+            onsubmit="return confirm('Reject all {{ pending|length }} pending question(s)? Cannot be undone.');">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <button type="submit" class="btn-reject">✗ Reject All</button>
+
+      </form>
+
+    </div>
+
+
+    <div class="pending-list">
+
+      {% for p in pending %}
+
+      <div class="pending-card">
+
+        <div class="pending-meta">
+
+          <span class="badge-pill">{{ p.subject.subject_code if p.subject else '—' }}</span>
+
+          <span class="badge-pill secondary">{{ p.unit.unit_name if p.unit else '—' }}</span>
+
+          <span class="badge-pill {% if p.question_kind == 'part_a' %}pill-a{% else %}pill-b{% endif %}">
+
+            {{ 'Part A' if p.question_kind == 'part_a' else 'Part B Group' }}
+
+          </span>
+
+        </div>
+
+
+        {% if p.question_kind == 'part_a' %}
+
+          <p class="pending-text">{{ p.payload_json.question_text }}</p>
+
+          <p class="pending-detail">Bloom: {{ p.payload_json.bloom_level }}</p>
+
+        {% else %}
+
+          <p class="pending-detail"><strong>{{ p.payload_json.question_type }}</strong> · {{ p.payload_json.difficulty }}</p>
+
+          {% for part in p.payload_json.parts %}
+
+          <p class="pending-text">
+
+            {% if part.part_label %}<strong>({{ part.part_label }})</strong> {% endif %}
+
+            {{ part.question_text }}
+
+            <span class="pending-detail">— {{ part.marks }} marks, {{ part.bloom_level }}</span>
+
+          </p>
+
+          {% endfor %}
+
+        {% endif %}
+
+
+        <div class="pending-actions">
+
+          <form action="/questions/pending/{{ p.id }}/approve" method="POST" style="display:inline;">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <button type="submit" class="btn-approve btn-sm">✓ Approve</button>
+
+          </form>
+
+          <form action="/questions/pending/{{ p.id }}/reject" method="POST" style="display:inline;">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <button type="submit" class="btn-reject btn-sm">✗ Reject</button>
+
+          </form>
+
+        </div>
+
+      </div>
+
+      {% endfor %}
+
+    </div>
+
+    {% endif %}
+
+  </div>
+
+  {% endif %}
+
+</div>
+
+
+<style>
+
+.page-wrapper { max-width: 960px; margin: 0 auto; padding: 36px 24px 60px; }
+
+.page-header { margin-bottom: 24px; }
+
+.page-header h1 { margin: 0 0 6px; font-size: 1.7rem; color: #1a2530; }
+
+.page-header p { margin: 0; color: #7f8c8d; }
+
+
+.flash-msg {
+
+  margin-top: 16px; padding: 12px 18px; background: #eaf6fb;
+
+  border: 1px solid #aad4e8; border-radius: 8px; color: #1a5276;
+
+  font-size: 0.9rem; line-height: 1.5;
+
+}
+
+
+/* Tabs */
+
+.tab-bar { display: flex; gap: 4px; border-bottom: 2px solid #e2e8f0; }
+
+.tab-btn {
+
+  padding: 10px 20px; border: none; background: none; cursor: pointer;
+
+  font-size: 0.9rem; font-weight: 600; color: #7f8c8d; border-radius: 8px 8px 0 0;
+
+  transition: all 0.15s;
+
+}
+
+.tab-btn:hover { background: #f0f3f7; color: #2c3e50; }
+
+.tab-btn.active { background: #fff; color: #3498db; border: 2px solid #e2e8f0; border-bottom: 2px solid #fff; margin-bottom: -2px; }
+
+
+/* Stats bar */
+
+.stats-bar {
+
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+
+  padding: 16px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+
+}
+
+.stat-chip { display: flex; flex-direction: column; }
+
+.stat-num { font-size: 1.5rem; font-weight: 700; color: #2c3e50; line-height: 1; }
+
+.stat-lbl { font-size: 0.78rem; color: #7f8c8d; margin-top: 2px; }
+
+.stat-chip.pending .stat-num { color: #e67e22; }
+
+.stat-divider { width: 1px; height: 36px; background: #edf0f4; }
+
+.stat-link { margin-left: auto; font-size: 0.88rem; color: #3498db; font-weight: 600; text-decoration: none; }
+
+.stat-link:hover { text-decoration: underline; }
+
+
+/* Cards */
+
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:28px 32px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+
+.card-header { display:flex; gap:16px; align-items:flex-start; margin-bottom:20px; }
+
+.card-icon { width:40px; height:40px; border-radius:10px; background:#eef6fd; color:#3498db; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; }
+
+.pending-icon { background:#fff8ee; color:#e67e22; }
+
+.card-title { margin:0 0 4px; font-size:1.15rem; color:#1a2530; display:flex; align-items:center; gap:10px; }
+
+.card-subtitle { margin:0; color:#7f8c8d; font-size:0.88rem; }
+
+.badge { background:#3498db; color:#fff; border-radius:20px; padding:2px 10px; font-size:0.8rem; font-weight:700; }
+
+
+/* Format guide */
+
+.format-guide { border:1px solid #e8ecf2; border-radius:8px; overflow:hidden; margin-bottom:18px; }
+
+.format-guide summary { padding:10px 16px; font-weight:600; cursor:pointer; background:#fafbfc; color:#2c3e50; font-size:0.9rem; }
+
+.format-guide summary:hover { background:#f0f3f7; }
+
+.format-body { padding:14px 16px; border-top:1px solid #e8ecf2; }
+
+.format-body pre { background:#f7f8fa; border:1px solid #e2e8f0; border-radius:6px; padding:12px; font-size:0.82em; overflow-x:auto; margin:0 0 8px; }
+
+.hint { color:#636e7b; font-size:0.83rem; margin:4px 0 0; }
+
+
+.toggle-row { display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.9rem; padding:10px 14px; background:#fafbfc; border:1px solid #e8ecf2; border-radius:8px; }
+
+.toggle-row input { accent-color:#3498db; }
+
+
+/* Form elements */
+
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+.field-group { display:flex; flex-direction:column; gap:6px; }
+
+.field-label { font-weight:600; font-size:0.88rem; color:#2c3e50; }
+
+.field-select, .field-input, .field-textarea {
+
+  padding:9px 12px; border:1px solid #dde3ec; border-radius:8px;
+
+  font-size:0.9rem; color:#2c3e50; background:#fff;
+
+  transition:border-color 0.18s, box-shadow 0.18s;
+
+  width:100%; box-sizing:border-box;
+
+}
+
+.field-textarea { resize:vertical; font-family:monospace; }
+
+.field-select:focus, .field-input:focus, .field-textarea:focus {
+
+  outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.12);
+
+}
+
+.dropdown-results {
+
+  position:absolute; z-index:50; top:calc(100% + 4px); left:0; right:0;
+
+  background:#fff; border:1px solid #dde3ec; border-radius:8px;
+
+  box-shadow:0 6px 20px rgba(0,0,0,0.1); max-height:220px; overflow-y:auto; display:none;
+
+}
+
+.dropdown-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid #f1f2f6; font-size:0.9rem; }
+
+.dropdown-item:last-child { border-bottom:none; }
+
+.dropdown-item:hover { background:#f0f7fd; }
+
+
+/* Buttons */
+
+.form-footer { display:flex; gap:12px; align-items:center; }
+
+.btn-primary { padding:10px 24px; background:#3498db; color:#fff; border:none; border-radius:8px; font-weight:600; font-size:0.92rem; cursor:pointer; transition:background 0.18s; }
+
+.btn-primary:hover { background:#2980b9; }
+
+.btn-approve { padding:8px 18px; background:#27ae60; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+
+.btn-approve:hover { background:#219a52; }
+
+.btn-reject { padding:8px 18px; background:#e74c3c; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+
+.btn-reject:hover { background:#c0392b; }
+
+.btn-sm { padding:5px 12px; font-size:0.85rem; }
+
+
+/* Bulk actions */
+
+.bulk-actions { display:flex; gap:10px; margin-bottom:20px; }
+
+
+/* Pending cards */
+
+.pending-list { display:flex; flex-direction:column; gap:12px; }
+
+.pending-card { border:1px solid #f0d264; background:#fffcf0; border-radius:10px; padding:16px 20px; }
+
+.pending-meta { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+
+.badge-pill { padding:3px 10px; border-radius:20px; font-size:0.78rem; font-weight:600; background:#edf0f4; color:#636e7b; }
+
+.badge-pill.secondary { background:#f1f2f6; }
+
+.pill-a { background:#e8f8f0; color:#1e8449; }
+
+.pill-b { background:#eaf4fb; color:#1a6fa8; }
+
+.pending-text { margin:0 0 4px; color:#2c3e50; font-size:0.92rem; line-height:1.5; }
+
+.pending-detail { margin:0 0 6px; color:#7f8c8d; font-size:0.83rem; }
+
+.pending-actions { display:flex; gap:8px; margin-top:12px; }
+
+
+@media (max-width:600px) {
+
+  .card { padding:20px 16px; }
+
+  .form-row { grid-template-columns:1fr; }
+
+  .stats-bar { gap:12px; }
+
+  .tab-btn { padding:8px 12px; font-size:0.82rem; }
+
+}
+
+</style>
+
+
+<script>
+
+function showTab(tabId, btn) {
+
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  document.getElementById(tabId).style.display = '';
+
+  btn.classList.add('active');
+
+}
+
+
+function loadUnitsFor(subjectId, unitSelect) {
+
+    unitSelect.innerHTML = '<option value="" disabled selected>Loading…</option>';
+
+    fetch('/api/units?subject_id=' + subjectId)
+
+        .then(r => r.json())
+
+        .then(units => {
+
+            if (!units.length) { unitSelect.innerHTML = '<option value="" disabled selected>No units found</option>'; return; }
+
+            unitSelect.innerHTML = '<option value="" disabled selected>Select a unit</option>' +
+
+                units.map(u => `<option value="${u.id}">Unit ${u.unit_number} — ${u.unit_name}</option>`).join('');
+
+        });
+
+}
+
+
+function wireSubjectSearch(searchId, hiddenId, resultsId, unitSelectId) {
+
+    const search = document.getElementById(searchId);
+
+    const hidden = document.getElementById(hiddenId);
+
+    const results = document.getElementById(resultsId);
+
+    const unitSel = unitSelectId ? document.getElementById(unitSelectId) : null;
+
+    if (!search) return;
+
+    let timer;
+
+    function label(s) { return (s.code_pending ? 'Code TBD' : s.subject_code) + ' — ' + s.subject_name; }
+
+    search.addEventListener('input', () => {
+
+        hidden.value = '';
+
+        clearTimeout(timer);
+
+        const q = search.value.trim();
+
+        if (!q) { results.style.display = 'none'; return; }
+
+        timer = setTimeout(() => {
+
+            fetch('/api/search-subjects?q=' + encodeURIComponent(q))
+
+                .then(r => r.json())
+
+                .then(subjects => {
+
+                    results.innerHTML = '';
+
+                    if (!subjects.length) { results.innerHTML = '<div class="dropdown-item" style="color:#95a5a6;">No matches</div>'; }
+
+                    else subjects.forEach(s => {
+
+                        const item = document.createElement('div');
+
+                        item.className = 'dropdown-item';
+
+                        item.textContent = `${label(s)}  (${s.branch_code}, ${s.term})`;
+
+                        item.addEventListener('mousedown', e => {
+
+                            e.preventDefault();
+
+                            search.value = label(s); hidden.value = s.id;
+
+                            results.style.display = 'none';
+
+                            if (unitSel) loadUnitsFor(s.id, unitSel);
+
+                        });
+
+                        results.appendChild(item);
+
+                    });
+
+                    results.style.display = 'block';
+
+                });
+
+        }, 200);
+
+    });
+
+    search.addEventListener('focus', () => { if (search.value.trim() && results.innerHTML) results.style.display = 'block'; });
+
+    document.addEventListener('click', e => { if (!results.contains(e.target) && e.target !== search) results.style.display = 'none'; });
+
+}
+
+
+wireSubjectSearch('bulk_subject_search', 'bulk_subject_id', 'bulk_subject_results', 'bulk_unit_id');
+
+wireSubjectSearch('mid_obj_subject_search', 'mid_obj_subject_id', 'mid_obj_subject_results', null);
+
+// Assignment subject search — stores subject_code
+(function() {
+  const search = document.getElementById('assign_subject_search');
+  const hidden = document.getElementById('assign_subject_code');
+  const results = document.getElementById('assign_subject_results');
+  if (!search) return;
+  let timer;
+  search.addEventListener('input', () => {
+    hidden.value = '';
+    clearTimeout(timer);
+    const q = search.value.trim();
+    if (!q) { results.style.display = 'none'; return; }
+    timer = setTimeout(() => {
+      fetch('/api/search-subjects?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(subjects => {
+          results.innerHTML = '';
+          if (!subjects.length) { results.innerHTML = '<div class="dropdown-item" style="color:#95a5a6;">No matches</div>'; }
+          else subjects.forEach(s => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            const code = s.code_pending ? 'Code TBD' : s.subject_code;
+            item.textContent = code + ' — ' + s.subject_name + '  (' + s.branch_code + ', ' + s.term + ')';
+            item.addEventListener('mousedown', e => {
+              e.preventDefault();
+              search.value = code + ' — ' + s.subject_name;
+              hidden.value = s.subject_code || '';
+              results.style.display = 'none';
+            });
+            results.appendChild(item);
+          });
+          results.style.display = 'block';
+        });
+    }, 200);
+  });
+  search.addEventListener('focus', () => { if (search.value.trim() && results.innerHTML) results.style.display = 'block'; });
+  document.addEventListener('click', e => { if (!results.contains(e.target) && e.target !== search) results.style.display = 'none'; });
+})();
+
+
+
+const multiToggle = document.getElementById('multi_unit_toggle');
+
+const bulkUnitField = document.getElementById('bulk_unit_field');
+
+const bulkUnitSel = document.getElementById('bulk_unit_id');
+
+const bulkTA = document.getElementById('bulk_text');
+
+const hint = document.getElementById('multi-unit-hint');
+
+const fmtEx = document.getElementById('format-example');
+
+const SINGLE = fmtEx ? fmtEx.textContent : '';
+
+const MULTI = "[UNIT:1]\n" + SINGLE + "\n\n[UNIT:2]\n[PART-A]\nWhat is recursion? | Understand";
+
+if (multiToggle) {
+
+  multiToggle.addEventListener('change', function() {
+
+    if (this.checked) {
+
+        bulkUnitField.style.display = 'none'; bulkUnitSel.removeAttribute('required'); bulkUnitSel.removeAttribute('name');
+
+        if (hint) hint.style.display = 'block'; if (fmtEx) fmtEx.textContent = MULTI;
+
+        bulkTA.placeholder = "[UNIT:1]\n[PART-A]\nDefine an algorithm. | Remember\n\n[UNIT:2]\n[PART-A]\nWhat is recursion? | Understand";
+
+    } else {
+
+        bulkUnitField.style.display = ''; bulkUnitSel.setAttribute('required','required'); bulkUnitSel.setAttribute('name','unit_id');
+
+        if (hint) hint.style.display = 'none'; if (fmtEx) fmtEx.textContent = SINGLE;
+
+    }
+
+  });
+
+}
+
+</script>
+
+{% endblock %}

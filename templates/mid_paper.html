@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+
+  <div class="action-bar">
+    <a href="{{ url_for('generator_page') }}" class="btn-secondary">← Generator</a>
+    <a href="/export-mid-objective-pdf/{{ paper.paper_id }}" class="btn-primary" style="background:#8e44ad;">⬇ Objective PDF</a>
+    <a href="/export-mid-subjective-pdf/{{ paper.paper_id }}" class="btn-primary" style="background:#16a085;">⬇ Subjective PDF</a>
+    <a href="/export-mid-pdf/{{ paper.paper_id }}" class="btn-primary">⬇ Full PDF</a>
+  </div>
+
+  <div class="exam-paper">
+
+    <div class="paper-header">
+      <div class="college-name">Sreyas Institute of Engineering and Technology</div>
+      <div class="college-sub">An Autonomous Institution</div>
+      <div class="college-sub small">Approved by AICTE, Affiliated to JNTUH | Accredited by NAAC-A Grade, NBA (CSE, ECE &amp; ME) &amp; ISO 9001:2015 Certified</div>
+    </div>
+
+    <div class="exam-title-block">
+      <div class="exam-title">CONTINUOUS INTERNAL EVALUATION-{{ paper.mid_number }}</div>
+      <div class="exam-subtitle">Academic Year 2025-26</div>
+    </div>
+
+    <table class="info-table">
+      <tr>
+        <td class="info-cell"><span class="info-label">Program:</span> B.Tech R22 Regulation</td>
+        <td class="info-cell"><span class="info-label">Branch:</span> ___</td>
+        <td class="info-cell"><span class="info-label">Year &amp; Sem:</span> ___</td>
+        <td class="info-cell hall-ticket"><span class="info-label">Hall Ticket No:</span> <span class="ticket-boxes">□□□□□□□□□□</span></td>
+      </tr>
+      <tr>
+        <td class="info-cell"><span class="info-label">Time:</span> 2 Hours</td>
+        <td class="info-cell" colspan="2"><span class="info-label">Date of Exam:</span> _______________</td>
+        <td class="info-cell"><span class="info-label">Max. Marks:</span> 30</td>
+      </tr>
+    </table>
+
+    <table class="subject-table">
+      <tr>
+        <td class="sub-code">{{ paper.subject_code }}</td>
+        <td class="sub-name">{{ paper.subject_name }}</td>
+        <td class="set-no">Set No. ___</td>
+      </tr>
+    </table>
+
+    <div class="part-heading">PART-A [MARKS: 10] (All questions carry equal marks)</div>
+
+    <div class="section-heading">I. Choose the correct alternative.</div>
+    <ol class="q-list" id="mcq-list">
+      {% for q in paper.part_a_mcq %}
+      <li class="q-item">
+        <span class="q-text">{{ q.text }}</span>
+        <div class="options-row">
+          <span class="opt"><strong>A)</strong> {{ q.option_a }}</span>
+          <span class="opt"><strong>B)</strong> {{ q.option_b }}</span>
+          <span class="opt"><strong>C)</strong> {{ q.option_c }}</span>
+          <span class="opt"><strong>D)</strong> {{ q.option_d }}</span>
+        </div>
+        <div class="q-meta">
+          <span class="unit-pill">{{ q.unit_name }}</span>
+          {% if q.correct_answer %}<span class="ans-pill">Ans: {{ q.correct_answer }}</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <div class="section-heading" style="margin-top:20px;">II. Fill in the blanks.</div>
+    <ol class="q-list" start="11" id="fill-list">
+      {% for q in paper.part_a_fib %}
+      <li class="q-item">
+        <span class="q-text">{{ q.text }}</span>
+        <div class="q-meta">
+          <span class="unit-pill">{{ q.unit_name }}</span>
+          {% if q.answer_text %}<span class="ans-pill">Ans: {{ q.answer_text }}</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <div class="divider">---oo0oo---</div>
+
+    <div class="part-heading">PART-B [MARKS: 20]</div>
+
+    <div class="partb-note">
+      <strong>Note:</strong> Answer any <strong>Four</strong> questions out of Six. Each question carries 5 marks.
+    </div>
+
+    <table class="partb-table">
+      <thead>
+        <tr>
+          <th class="col-qno">Q.No</th>
+          <th class="col-qtext">Question</th>
+          <th class="col-marks">Marks</th>
+        </tr>
+      </thead>
+      <tbody id="part-b-slots">
+        {% for g in paper.part_b %}
+        {% set loop_idx = loop.index %}
+        {% if g.question_type == 'Single' %}
+          <tr class="slot-row" data-slot="{{ loop_idx }}">
+            <td class="col-qno">{{ loop_idx }}</td>
+            <td class="col-qtext" id="slot-{{ loop_idx }}-group">{{ g.text }}</td>
+            <td class="col-marks">5M</td>
+          </tr>
+        {% else %}
+          <tr class="slot-row" data-slot="{{ loop_idx }}">
+            <td class="col-qno">{{ loop_idx }}</td>
+            <td class="col-qtext" id="slot-{{ loop_idx }}-group">
+              {% for part in g.parts %}
+              <div class="sub-q"><strong>{{ part.label }})</strong> {{ part.text }}</div>
+              {% endfor %}
+            </td>
+            <td class="col-marks">
+              {% for part in g.parts %}<div>{{ part.marks }}M</div>{% endfor %}
+            </td>
+          </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="divider">---oo0oo---</div>
+  </div>
+
+</div>
+
+<style>
+.page-wrapper { max-width: 860px; margin: 24px auto; padding: 0 16px 60px; }
+.action-bar { display:flex; gap:10px; justify-content:flex-end; margin-bottom:16px; }
+.btn-primary { background:#2980b9; color:#fff; padding:9px 20px; border-radius:7px; font-size:.88rem; font-weight:600; text-decoration:none; }
+.btn-secondary { background:#ecf0f1; color:#333; padding:9px 20px; border-radius:7px; font-size:.88rem; text-decoration:none; }
+.exam-paper { background:#fff; border:1px solid #c8cdd8; border-radius:4px; padding:28px 36px; font-family: 'Times New Roman', Times, serif; color:#111; }
+.paper-header { text-align:center; border-bottom:2px solid #111; padding-bottom:10px; margin-bottom:10px; }
+.college-name { font-size:1.25rem; font-weight:700; color:#1a3a6e; letter-spacing:.4px; }
+.college-sub { font-size:.82rem; color:#333; margin-top:2px; }
+.college-sub.small { font-size:.74rem; color:#555; }
+.exam-title-block { text-align:center; margin:10px 0; }
+.exam-title { font-size:1.1rem; font-weight:700; letter-spacing:.5px; }
+.exam-subtitle { font-size:.9rem; color:#444; }
+.info-table { width:100%; border-collapse:collapse; border:1px solid #aaa; margin-top:10px; font-size:.85rem; }
+.info-cell { border:1px solid #aaa; padding:5px 8px; }
+.info-label { font-weight:700; }
+.hall-ticket { text-align:right; }
+.ticket-boxes { letter-spacing:6px; font-size:1rem; }
+.subject-table { width:100%; border-collapse:collapse; border:1px solid #aaa; margin-top:0; font-size:.88rem; }
+.sub-code { border:1px solid #aaa; padding:5px 10px; font-weight:700; width:100px; text-align:center; }
+.sub-name { border:1px solid #aaa; padding:5px 10px; font-weight:700; text-align:center; }
+.set-no { border:1px solid #aaa; padding:5px 10px; text-align:center; width:80px; }
+.part-heading { text-align:center; font-weight:700; font-size:.92rem; background:#f0f0f0; border:1px solid #bbb; padding:6px; margin:14px 0 10px; }
+.section-heading { font-weight:700; font-size:.9rem; margin:10px 0 6px; }
+.q-list { padding-left:22px; margin:0; }
+.q-item { margin-bottom:12px; line-height:1.55; font-size:.88rem; }
+.q-text { display:block; }
+.options-row { display:grid; grid-template-columns:1fr 1fr; gap:3px 24px; margin-top:4px; font-size:.85rem; }
+.opt { display:block; }
+.q-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.unit-pill { display:inline-block; background:#eef4fb; color:#2471a3; font-family:'Segoe UI',sans-serif; font-size:.72rem; padding:1px 7px; border-radius:10px; }
+.ans-pill { display:inline-block; background:#eaf6f1; color:#1a7a4a; font-family:'Segoe UI',sans-serif; font-size:.72rem; padding:1px 7px; border-radius:10px; }
+.divider { text-align:center; font-size:.8rem; color:#888; margin:18px 0 14px; letter-spacing:2px; }
+.partb-note { font-size:.82rem; line-height:1.6; border:1px solid #bbb; padding:8px 12px; margin-bottom:10px; background:#fafafa; }
+.partb-table { width:100%; border-collapse:collapse; font-size:.87rem; margin-top:4px; }
+.partb-table thead tr { background:#f0f0f0; }
+.partb-table th, .partb-table td { border:1px solid #aaa; padding:8px 10px; vertical-align:top; }
+.col-qno { width:40px; text-align:center; font-weight:700; }
+.col-marks { width:60px; text-align:center; font-weight:600; }
+.sub-q { margin-bottom:6px; line-height:1.6; }
+.sub-q:last-child { margin-bottom:0; }
+</style>
+{% endblock %}

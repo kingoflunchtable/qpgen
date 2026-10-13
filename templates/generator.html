@@ -1,0 +1,608 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+
+  <div class="page-header">
+    <h1>Exam Generator</h1>
+    <p>Choose a branch, year &amp; semester, pick a subject, select units, and set difficulty.</p>
+  </div>
+
+  {% if subjects %}
+  <div class="card">
+    <form id="generate-form">
+
+      <div class="form-grid">
+
+        <div class="field-group">
+          <label class="field-label">Branch</label>
+          <select id="branch_id" name="branch_id" class="field-select">
+            <option value="">All Branches</option>
+            {% for branch in branches %}
+            <option value="{{ branch.id }}">{{ branch.branch_code }} — {{ branch.branch_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">Year</label>
+            <select id="academic_year" name="academic_year" class="field-select">
+              <option value="">Any Year</option>
+              <option value="1">I Year</option>
+              <option value="2">II Year</option>
+              <option value="3">III Year</option>
+              <option value="4">IV Year</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Semester</label>
+            <select id="semester_number" name="semester_number" class="field-select">
+              <option value="">Any Semester</option>
+              <option value="1">Semester I</option>
+              <option value="2">Semester II</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group" style="position:relative;">
+          <label class="field-label">Search Subject</label>
+          <input type="text" id="subject_search" placeholder="Type a subject name or code…" class="field-input" autocomplete="off">
+          <div id="search-results" class="dropdown-results"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Subject</label>
+          <select id="subject_code" name="subject_code" class="field-select">
+            {% for subject in subjects %}
+            <option value="{{ subject.subject_code }}" data-id="{{ subject.id }}">
+              {{ subject.subject_code }} — {{ subject.subject_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="field-group">
+        <label class="field-label">Units to include</label>
+        <div id="units-container" class="units-box">
+          <p class="muted">Loading units…</p>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="field-group">
+        <label class="field-label">Exam Type</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="exam_type" value="semester" checked onchange="toggleExamType()"> Semester Exam (60 Marks)</label>
+          <label class="radio-label"><input type="radio" name="exam_type" value="mid" onchange="toggleExamType()"> Mid Exam (30 Marks)</label>
+        </div>
+      </div>
+
+      <div id="mid-options" style="display:none;" class="field-group">
+        <label class="field-label">Mid Exam Number</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="mid_number" value="1" checked> Mid 1 &nbsp;<small class="hint" style="display:inline">(Units 1, 2, ½ of Unit 3)</small></label>
+          <label class="radio-label"><input type="radio" name="mid_number" value="2"> Mid 2 &nbsp;<small class="hint" style="display:inline">(Units 4, 5, ½ of Unit 3)</small></label>
+        </div>
+        <p class="hint" style="margin-top:8px;">Mid exam needs <strong>MCQ + Fill-in-blank</strong> objective questions in the question bank. Check the <a href="/api/mid-objectives?subject_code=" id="mid-obj-link">objective question count</a> for this subject before generating.</p>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Difficulty</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="difficulty" value="Mixed" checked> Mixed</label>
+          <label class="radio-label"><input type="radio" name="difficulty" value="Easy"> Easy</label>
+          <label class="radio-label"><input type="radio" name="difficulty" value="Medium"> Medium</label>
+          <label class="radio-label"><input type="radio" name="difficulty" value="Hard"> Hard</label>
+        </div>
+        <p class="hint">Difficulty is a preference — if a unit lacks enough questions at the chosen level, it falls back to any difficulty so generation doesn't fail.</p>
+      </div>
+
+      <div class="form-footer">
+        <button type="submit" class="btn-primary" id="generate-btn">
+          <span id="btn-text">Generate Paper</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <div id="result-card" class="result-card" style="display:none;"></div>
+
+  <!-- ================================================================
+       FORMAT PAPER MODAL — collects the publish-time details the app
+       has no way to know on its own (Set number, Regulation, which exact
+       exam sitting/date this is, branch label, academic year) before
+       building the final PDF. Remembers the last values used via
+       localStorage so re-formatting a similar paper later doesn't mean
+       retyping everything from scratch.
+       ================================================================ -->
+  <div id="format-modal-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Format Paper</h2>
+        <button type="button" class="modal-close" onclick="closeFormatModal()">&times;</button>
+      </div>
+      <p class="modal-sub">These details appear on the printed paper. Fill them in to match this specific exam sitting — they're not something the app can know on its own.</p>
+
+      <form id="format-form">
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">Set Number</label>
+            <select id="fmt_set_number" class="field-select">
+              <option value="1">1</option><option value="2">2</option>
+              <option value="3">3</option><option value="4">4</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Regulation</label>
+            <input type="text" id="fmt_regulation" class="field-input" value="R22" placeholder="e.g. R22">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">Academic Year</label>
+            <select id="fmt_academic_year_label" class="field-select">
+              <option value="I">I Year</option><option value="II">II Year</option>
+              <option value="III">III Year</option><option value="IV">IV Year</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Semester</label>
+            <select id="fmt_semester_label" class="field-select">
+              <option value="I">I Semester</option><option value="II">II Semester</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Branch (as shown on the paper)</label>
+          <input type="text" id="fmt_branch" class="field-input" value="COMMON TO ALL" placeholder="e.g. COMMON TO ALL, or CSE, or AIML">
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">Exam Session</label>
+            <select id="fmt_exam_session" class="field-select">
+              <option value="Regular/Supplementary">Regular/Supplementary</option>
+              <option value="Regular">Regular</option>
+              <option value="Supplementary">Supplementary</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Exam Month &amp; Year</label>
+            <input type="text" id="fmt_exam_month_year" class="field-input" placeholder="e.g. July 2024">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Academic Year Range <span class="hint-inline">(optional — shown as "For the Academic year ...")</span></label>
+          <input type="text" id="fmt_academic_year_range" class="field-input" placeholder="e.g. 2023-24">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeFormatModal()">Cancel</button>
+          <button type="submit" class="btn-primary">⬇ Download PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card card-warning">
+    <p>No subjects found. Run <code>python seed.py</code> to load sample data first.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.page-wrapper { max-width: 780px; margin: 0 auto; padding: 36px 24px 60px; }
+.page-header { margin-bottom: 28px; }
+.page-header h1 { margin: 0 0 6px; font-size: 1.7rem; color: #1a2530; }
+.page-header p { margin: 0; color: #7f8c8d; font-size: 0.95rem; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 28px 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.card-warning { border-color: #fde8cc; background: #fffaf5; }
+
+.form-grid { display: flex; flex-direction: column; gap: 20px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-weight: 600; font-size: 0.9rem; color: #2c3e50; }
+.field-select, .field-input {
+  padding: 9px 12px;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: #2c3e50;
+  background: #fff;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.field-select:focus, .field-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.12);
+}
+
+.dropdown-results {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+}
+.dropdown-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f2f6;
+  font-size: 0.9rem;
+}
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover { background: #f0f7fd; }
+
+.units-box {
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #fafbfc;
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.unit-label {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.unit-label input[type="checkbox"] { accent-color: #3498db; }
+.unit-label:has(input:checked) { border-color: #3498db; background: #eef6fd; color: #1a6fa8; }
+
+.radio-group { display: flex; gap: 20px; flex-wrap: wrap; }
+.radio-label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 0.92rem; }
+.radio-label input { accent-color: #3498db; }
+
+.hint { margin: 8px 0 0; color: #95a5a6; font-size: 0.83rem; }
+.muted { color: #95a5a6; margin: 0; font-size: 0.9rem; }
+
+.section-divider { border: none; border-top: 1px solid #edf0f4; margin: 22px 0; }
+
+.form-footer { margin-top: 28px; display: flex; align-items: center; gap: 16px; }
+.btn-primary {
+  padding: 11px 28px;
+  background: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+}
+.btn-primary:hover { background: #2980b9; }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { background: #a8d4ef; cursor: not-allowed; }
+
+.result-card {
+  margin-top: 20px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  border: 1px solid #c3e6cb;
+  background: #f0fff4;
+  color: #1e6e3a;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.result-card.error { border-color: #f5c6cb; background: #fff5f5; color: #8b1a1a; }
+.result-card a { color: #27ae60; font-weight: 600; }
+.result-card.error a { color: #c0392b; }
+
+@media (max-width: 600px) {
+  .card { padding: 20px 18px; }
+  .field-row { grid-template-columns: 1fr; }
+}
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(20, 28, 38, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: modal-fade-in 0.18s ease-out;
+}
+@keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 30px;
+  max-width: 460px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  transform: translateY(10px);
+  animation: modal-rise 0.2s ease-out forwards;
+}
+@keyframes modal-rise { to { transform: translateY(0); } }
+
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.modal-header h2 { margin: 0; font-size: 1.25rem; color: #1a2530; }
+.modal-close {
+  background: none; border: none; font-size: 1.4rem; line-height: 1;
+  color: #95a5a6; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.modal-close:hover { background: #f1f2f6; color: #2c3e50; }
+
+.modal-sub { color: #7f8c8d; font-size: 0.88rem; margin: 0 0 18px; line-height: 1.5; }
+.hint-inline { font-weight: 400; color: #95a5a6; font-size: 0.82rem; }
+
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.btn-secondary {
+  padding: 10px 18px;
+  background: #f1f2f6;
+  color: #2c3e50;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover { background: #e2e6ea; }
+
+#format-form .field-group { margin-bottom: 14px; }
+
+</style>
+
+<script>
+const branchSelect = document.getElementById('branch_id');
+const yearSelect = document.getElementById('academic_year');
+const semSelect = document.getElementById('semester_number');
+const subjectSelect = document.getElementById('subject_code');
+const unitsContainer = document.getElementById('units-container');
+const resultCard = document.getElementById('result-card');
+const searchInput = document.getElementById('subject_search');
+const searchResults = document.getElementById('search-results');
+
+function subjectLabel(s) {
+    let label = `${s.subject_code} — ${s.subject_name}`;
+    if (s.elective_group) label += `  [${s.elective_group}]`;
+    if (s.code_pending) label += `  (code TBD)`;
+    return label;
+}
+
+async function loadSubjects() {
+    const params = new URLSearchParams();
+    if (branchSelect.value) params.set('branch_id', branchSelect.value);
+    if (yearSelect.value) params.set('academic_year', yearSelect.value);
+    if (semSelect.value) params.set('semester_number', semSelect.value);
+    const res = await fetch('/api/subjects' + (params.toString() ? `?${params}` : ''));
+    const subjects = await res.json();
+    subjectSelect.innerHTML = '';
+    if (!subjects.length) {
+        subjectSelect.innerHTML = '<option value="">No subjects match</option>';
+        unitsContainer.innerHTML = '<p class="muted">No subject selected.</p>';
+        return;
+    }
+    subjects.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.subject_code; opt.dataset.id = s.id;
+        opt.textContent = subjectLabel(s);
+        subjectSelect.appendChild(opt);
+    });
+    loadUnits();
+}
+
+async function loadUnits() {
+    const subjectCode = subjectSelect.value;
+    if (!subjectCode) { unitsContainer.innerHTML = '<p class="muted">No subject selected.</p>'; return; }
+    unitsContainer.innerHTML = '<p class="muted">Loading units…</p>';
+    const res = await fetch(`/api/units?subject_code=${encodeURIComponent(subjectCode)}`);
+    const units = await res.json();
+    if (!units.length) { unitsContainer.innerHTML = '<p class="muted" style="color:#e74c3c;">No units found for this subject.</p>'; return; }
+    unitsContainer.innerHTML = '';
+    units.forEach(u => {
+        const lbl = document.createElement('label');
+        lbl.className = 'unit-label';
+        lbl.innerHTML = `<input type="checkbox" class="unit-checkbox" value="${u.id}" checked> Unit ${u.unit_number}: ${u.unit_name}`;
+        unitsContainer.appendChild(lbl);
+    });
+}
+
+let searchDebounce;
+searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    const q = searchInput.value.trim();
+    if (!q) { searchResults.style.display = 'none'; return; }
+    searchDebounce = setTimeout(async () => {
+        const params = new URLSearchParams({ q });
+        if (branchSelect.value) params.set('branch_id', branchSelect.value);
+        if (yearSelect.value) params.set('academic_year', yearSelect.value);
+        if (semSelect.value) params.set('semester_number', semSelect.value);
+        const res = await fetch(`/api/search-subjects?${params}`);
+        const results = await res.json();
+        searchResults.innerHTML = '';
+        if (!results.length) {
+            searchResults.innerHTML = '<div class="dropdown-item" style="color:#95a5a6;">No matches.</div>';
+        } else {
+            results.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.textContent = `${subjectLabel(s)}  (${s.branch_code}, ${s.term})`;
+                item.addEventListener('click', () => {
+                    let opt = Array.from(subjectSelect.options).find(o => o.value === s.subject_code);
+                    if (!opt) { opt = document.createElement('option'); opt.value = s.subject_code; opt.dataset.id = s.id; opt.textContent = subjectLabel(s); subjectSelect.appendChild(opt); }
+                    subjectSelect.value = s.subject_code;
+                    searchResults.style.display = 'none';
+                    searchInput.value = '';
+                    loadUnits();
+                });
+                searchResults.appendChild(item);
+            });
+        }
+        searchResults.style.display = 'block';
+    }, 250);
+});
+document.addEventListener('click', e => { if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none'; });
+
+branchSelect.addEventListener('change', loadSubjects);
+yearSelect.addEventListener('change', loadSubjects);
+semSelect.addEventListener('change', loadSubjects);
+subjectSelect.addEventListener('change', loadUnits);
+loadUnits();
+
+function toggleExamType() {
+    const isMid = document.querySelector('input[name="exam_type"]:checked')?.value === 'mid';
+    document.getElementById('mid-options').style.display = isMid ? 'block' : 'none';
+    document.getElementById('btn-text').textContent = isMid ? 'Generate Mid Paper' : 'Generate Paper';
+    // Hide unit selector for mid (units are fixed by mid number)
+    document.getElementById('units-container').closest('.field-group').style.display = isMid ? 'none' : 'block';
+}
+
+// Update mid objective link when subject changes
+subjectSelect.addEventListener('change', () => {
+    const code = subjectSelect.value;
+    const link = document.getElementById('mid-obj-link');
+    if (link) link.href = `/api/mid-objectives?subject_code=${code}`;
+});
+
+document.getElementById('generate-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const subjectCode = subjectSelect.value;
+    const difficulty = document.querySelector('input[name="difficulty"]:checked')?.value || 'Mixed';
+    const examType = document.querySelector('input[name="exam_type"]:checked')?.value || 'semester';
+    if (!subjectCode) { showResult('Please select a subject.', true); return; }
+
+    const btn = document.getElementById('generate-btn');
+    const btnText = document.getElementById('btn-text');
+    btn.disabled = true; btnText.textContent = 'Generating…';
+    resultCard.style.display = 'none';
+
+    try {
+        if (examType === 'mid') {
+            const midNumber = document.querySelector('input[name="mid_number"]:checked')?.value || '1';
+            const res = await fetch('/generate-mid', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject_code: subjectCode, mid_number: midNumber, difficulty })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showResult(
+                    `✓ Mid ${data.mid_number} paper generated for <strong>${data.subject_name}</strong> — 30 marks.<br><br>` +
+                    `<a href="/mid-paper/${data.paper_id}" class="btn-primary" style="padding:9px 20px; text-decoration:none;">📄 View / Download Mid Paper</a>`,
+                    false
+                );
+            } else {
+                showResult(data.error || 'Mid paper generation failed.', true);
+            }
+        } else {
+            const unitIds = Array.from(document.querySelectorAll('.unit-checkbox:checked')).map(cb => parseInt(cb.value, 10));
+            if (!unitIds.length) { showResult('Please select at least one unit.', true); btn.disabled = false; btnText.textContent = 'Generate Paper'; return; }
+            const res = await fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject_code: subjectCode, unit_ids: unitIds, difficulty })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showResult(`✓ Paper #${data.paper_id} generated for <strong>${data.subject_name}</strong> — ${data.total_marks} marks across ${data.units_used.length} unit(s).<br><br><button type="button" class="btn-primary" style="padding:9px 20px;" onclick="openFormatModal(${data.paper_id}, '${data.subject_name.replace(/'/g, "\\'")}')">📄 Format &amp; Download PDF</button>`, false);
+            } else {
+                showResult(data.error || 'Generation failed.', true);
+            }
+        }
+    } catch(err) {
+        showResult('Network error — check the server is running.', true);
+    } finally {
+        btn.disabled = false;
+        btnText.textContent = examType === 'mid' ? 'Generate Mid Paper' : 'Generate Paper';
+    }
+});
+
+function showResult(html, isError) {
+    resultCard.innerHTML = html;
+    resultCard.className = 'result-card' + (isError ? ' error' : '');
+    resultCard.style.display = 'block';
+}
+
+// ----------------------------------------------------------------------
+// FORMAT PAPER MODAL
+// ----------------------------------------------------------------------
+const FORMAT_STORAGE_KEY = 'qpgen_last_format';
+let currentFormatPaperId = null;
+
+function openFormatModal(paperId, subjectName) {
+    currentFormatPaperId = paperId;
+
+    // Pre-fill from the last format used, if any — saves retyping the
+    // same Set/Regulation/branch for every paper in one sitting.
+    try {
+        const saved = JSON.parse(localStorage.getItem(FORMAT_STORAGE_KEY) || '{}');
+        if (saved.set_number) document.getElementById('fmt_set_number').value = saved.set_number;
+        if (saved.regulation) document.getElementById('fmt_regulation').value = saved.regulation;
+        if (saved.academic_year_label) document.getElementById('fmt_academic_year_label').value = saved.academic_year_label;
+        if (saved.semester_label) document.getElementById('fmt_semester_label').value = saved.semester_label;
+        if (saved.branch) document.getElementById('fmt_branch').value = saved.branch;
+        if (saved.exam_session) document.getElementById('fmt_exam_session').value = saved.exam_session;
+        if (saved.exam_month_year) document.getElementById('fmt_exam_month_year').value = saved.exam_month_year;
+        if (saved.academic_year_range) document.getElementById('fmt_academic_year_range').value = saved.academic_year_range;
+    } catch (e) { /* localStorage unavailable or corrupted — just use defaults, not fatal */ }
+
+    document.getElementById('format-modal-overlay').style.display = 'flex';
+}
+
+function closeFormatModal() {
+    document.getElementById('format-modal-overlay').style.display = 'none';
+}
+
+document.getElementById('format-modal-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'format-modal-overlay') closeFormatModal();
+});
+
+document.getElementById('format-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!currentFormatPaperId) return;
+
+    const values = {
+        set_number: document.getElementById('fmt_set_number').value,
+        regulation: document.getElementById('fmt_regulation').value.trim(),
+        academic_year_label: document.getElementById('fmt_academic_year_label').value,
+        semester_label: document.getElementById('fmt_semester_label').value,
+        branch: document.getElementById('fmt_branch').value.trim(),
+        exam_session: document.getElementById('fmt_exam_session').value,
+        exam_month_year: document.getElementById('fmt_exam_month_year').value.trim(),
+        academic_year_range: document.getElementById('fmt_academic_year_range').value.trim(),
+    };
+
+    try { localStorage.setItem(FORMAT_STORAGE_KEY, JSON.stringify(values)); }
+    catch (e) { /* not fatal if storage is unavailable */ }
+
+    const params = new URLSearchParams(values);
+    window.location.href = `/export-pdf/${currentFormatPaperId}?${params.toString()}`;
+    closeFormatModal();
+});
+</script>
+{% endblock %}

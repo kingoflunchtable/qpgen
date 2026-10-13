@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+
+  <div class="page-header">
+    <h1>Curriculum Browser</h1>
+    <p>Read-only view of all subjects imported from the syllabus, organized by branch and term.
+       </p>
+  </div>
+
+  {% for entry in structure %}
+  <div class="branch-card">
+
+    <div class="branch-header">
+      <div class="branch-badge">{{ entry.branch.branch_code }}</div>
+      <div>
+        <div class="branch-name">{{ entry.branch.branch_name }}</div>
+        <div class="branch-sub">{{ entry.terms|length }} term(s)</div>
+      </div>
+    </div>
+
+    <div class="terms-grid">
+      {% for term in entry.terms %}
+      <div class="term-block">
+        <div class="term-label">
+          <span class="term-roman">{{ term.roman }}</span>
+          <span class="term-name">Year {{ term.year }}, Semester {{ term.semester }}</span>
+        </div>
+
+        {% if term.core %}
+        <table class="subject-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Subject</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in term.core %}
+            <tr>
+              <td class="code-cell {% if link.subject.code_pending %}code-pending{% endif %}">
+                {{ link.subject.subject_code }}{% if link.subject.code_pending %} <span class="tbd-tag">TBD</span>{% endif %}
+              </td>
+              <td class="name-cell">{{ link.subject.subject_name }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+        {% for slot_name, options in term.electives.items() %}
+        <div class="elective-block">
+          <div class="elective-header">{{ slot_name }} <span class="elective-sub">choose one</span></div>
+          <ul class="elective-list">
+            {% for link in options %}
+            <li>
+              {{ link.subject.subject_name }}
+              <span class="elective-code {% if link.subject.code_pending %}code-pending{% endif %}">
+                {{ link.subject.subject_code }}{% if link.subject.code_pending %}, TBD{% endif %}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+
+        {% if not term.core and not term.electives %}
+        <p class="no-subjects">No subjects imported for this term.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+  {% endfor %}
+
+</div>
+
+<style>
+.page-wrapper { max-width: 1040px; margin: 0 auto; padding: 36px 24px 60px; }
+.page-header { margin-bottom: 28px; }
+.page-header h1 { margin: 0 0 6px; font-size: 1.7rem; color: #1a2530; }
+.page-header p { margin: 0; color: #7f8c8d; font-size:0.93rem; }
+.code-pending-note { color: #e67e22; font-weight: 600; }
+
+/* Branch cards */
+.branch-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.branch-header {
+  display: flex; align-items: center; gap: 16px;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  padding: 18px 24px;
+}
+.branch-badge {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.branch-name { color: #fff; font-weight: 700; font-size: 1.05rem; }
+.branch-sub { color: rgba(255,255,255,0.6); font-size: 0.82rem; margin-top: 2px; }
+
+/* Terms grid */
+.terms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0;
+}
+.term-block {
+  padding: 20px 24px;
+  border-top: 1px solid #edf0f4;
+  border-right: 1px solid #edf0f4;
+}
+.term-block:last-child { border-right: none; }
+
+.term-label {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.term-roman {
+  background: #3498db;
+  color: #fff;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.term-name { font-weight: 600; font-size: 0.9rem; color: #34495e; }
+
+/* Subject table */
+.subject-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.88rem; margin-bottom: 12px;
+}
+.subject-table thead tr th {
+  background: #f7f9fc;
+  color: #7f8c8d;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px 10px;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: left;
+}
+.subject-table tbody tr { transition: background 0.12s; }
+.subject-table tbody tr:hover { background: #f7fbff; }
+.subject-table tbody tr:not(:last-child) td { border-bottom: 1px solid #f1f3f6; }
+.code-cell { padding: 8px 10px; color: #2c3e50; font-weight: 600; width: 120px; white-space: nowrap; }
+.name-cell { padding: 8px 10px; color: #34495e; }
+.code-pending { color: #e67e22; }
+.tbd-tag {
+  display: inline-block; background: #fef3e2; color: #d68910;
+  border-radius: 4px; padding: 1px 5px; font-size: 0.72rem; font-weight: 700;
+  vertical-align: middle; margin-left: 4px;
+}
+
+/* Electives */
+.elective-block {
+  background: #f4f9fd;
+  border: 1px solid #c9e4f7;
+  border-left: 4px solid #3498db;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+.elective-header { font-weight: 700; color: #1a6fa8; font-size: 0.88rem; margin-bottom: 8px; }
+.elective-sub { font-weight: 400; color: #7f8c8d; font-size: 0.8rem; margin-left: 6px; }
+.elective-list { margin: 0; padding-left: 18px; }
+.elective-list li { font-size: 0.87rem; color: #34495e; margin-bottom: 4px; }
+.elective-code { color: #7f8c8d; font-size: 0.82rem; margin-left: 4px; }
+
+.no-subjects { color: #b2bec3; font-size: 0.88rem; margin: 0; font-style: italic; }
+
+@media (max-width: 680px) {
+  .terms-grid { grid-template-columns: 1fr; }
+  .term-block { border-right: none; }
+}
+</style>
+{% endblock %}

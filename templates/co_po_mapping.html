@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.page-wrapper { max-width: 1500px; margin: 0 auto; padding: 24px 20px; }
+.page-header { margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.page-header h1 { font-size: 1.6rem; font-weight: 700; color: #1a2340; margin: 0 0 4px; }
+.page-header p { color: #666; font-size: .92rem; margin: 0; }
+.section-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 24px; margin-bottom: 20px; }
+
+/* Branch tabs */
+.branch-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.branch-tab { padding: 6px 18px; border-radius: 20px; font-size: .88rem; font-weight: 600; cursor: pointer; border: 2px solid #d1d5db; background: #fff; color: #6b7280; transition: all .15s; }
+.branch-tab.active { background: #1a2340; color: #fff; border-color: #1a2340; }
+.branch-tab:hover:not(.active) { border-color: #1a56db; color: #1a56db; }
+
+/* Searchable select */
+.search-select-wrap { position: relative; max-width: 560px; }
+#subj-search-input { width: 100%; padding: 10px 14px; font-size: .95rem; border: 2px solid #3b82f6; border-radius: 8px; box-sizing: border-box; outline: none; color: #1a2340; }
+#subj-search-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+#subj-dropdown { display: none; position: absolute; z-index: 300; background: #fff; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.12); width: 100%; max-height: 280px; overflow-y: auto; top: calc(100% + 4px); }
+#subj-dropdown.open { display: block; }
+.subj-opt { padding: 9px 14px; cursor: pointer; font-size: .9rem; border-bottom: 1px solid #f3f4f6; }
+.subj-opt:hover { background: #eff6ff; color: #1a56db; }
+.subj-opt.hidden { display: none; }
+
+/* Grid */
+#copo-section { display: none; }
+.subject-title { font-size: 1.1rem; font-weight: 700; color: #1a2340; margin-bottom: 4px; }
+.subject-code-badge { display: inline-block; background: #e8f0fe; color: #1a56db; font-size: .8rem; font-weight: 600; padding: 2px 10px; border-radius: 20px; margin-bottom: 16px; }
+
+.grid-scroll { overflow-x: auto; }
+table.copo-table { border-collapse: collapse; min-width: 1000px; width: 100%; font-size: .82rem; }
+table.copo-table th, table.copo-table td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: center; white-space: nowrap; }
+table.copo-table th { background: #1a2340; color: #fff; font-weight: 600; font-size: .76rem; }
+table.copo-table th.co-col { background: #1e3a5f; text-align: left; min-width: 55px; }
+table.copo-table th.stmt-col { background: #1e3a5f; text-align: left; min-width: 260px; white-space: normal; }
+table.copo-table th.avg-col { background: #7c3aed; }
+table.copo-table td.co-label { font-weight: 700; color: #1a56db; text-align: left; background: #f8faff; }
+table.copo-table td.stmt-cell { text-align: left; white-space: normal; max-width: 300px; color: #333; font-size: .79rem; }
+table.copo-table td.co-avg-cell { background: #f3e8ff; font-weight: 700; color: #6d28d9; }
+table.copo-table td.po-avg-cell { background: #fef3c7; font-weight: 700; color: #92400e; }
+table.copo-table td.po-cell { cursor: pointer; transition: background .12s; min-width: 36px; }
+table.copo-table td.po-cell input { width: 28px; border: none; background: transparent; text-align: center; font-size: .82rem; font-weight: 600; outline: none; color: inherit; cursor: pointer; }
+.val-3 { background: #dcfce7 !important; color: #166534 !important; }
+.val-2 { background: #fef9c3 !important; color: #854d0e !important; }
+.val-1 { background: #fee2e2 !important; color: #991b1b !important; }
+.val-dash { background: #f9fafb; color: #9ca3af; }
+
+.action-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+.btn { padding: 9px 18px; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; border: none; transition: background .15s; }
+.btn-save { background: #16a34a; color: #fff; } .btn-save:hover { background: #15803d; }
+.btn-primary { background: #1a56db; color: #fff; } .btn-primary:hover { background: #1648c0; }
+.btn-danger { background: #dc2626; color: #fff; } .btn-danger:hover { background: #b91c1c; }
+.btn-outline { background: #fff; color: #374151; border: 1px solid #d1d5db; } .btn-outline:hover { background: #f9fafb; }
+.btn-purple { background: #7c3aed; color: #fff; } .btn-purple:hover { background: #6d28d9; }
+
+.legend { display: flex; gap: 12px; align-items: center; font-size: .8rem; color: #555; margin-top: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+#save-msg, #export-msg { font-size: .88rem; }
+#save-msg.ok { color: #16a34a; } #save-msg.err { color: #dc2626; }
+#loading-msg { color: #1a56db; font-size: .9rem; display: none; margin-top: 10px; }
+#error-msg { color: #dc2626; font-size: .9rem; display: none; margin-top: 10px; }
+.hint { font-size: .82rem; color: #6b7280; margin-top: 8px; }
+.dirty-indicator { display: none; font-size: .82rem; color: #d97706; font-weight: 600; }
+.dirty-indicator.show { display: inline; }
+.header-actions { display: flex; gap: 10px; align-items: center; }
+</style>
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <div>
+      <h1>CO-PO Mapping</h1>
+      <p>Select a subject to view, edit, and export its CO-PO mapping grid.</p>
+    </div>
+    <div class="header-actions">
+      <a href="/co-po/export-all" class="btn btn-purple">⬇ Export All (Excel)</a>
+      <a href="/analytics" class="btn btn-outline">📊 Analytics</a>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <!-- Branch filter tabs -->
+    <div class="branch-tabs">
+      <button class="branch-tab active" data-branch="ALL" onclick="setBranch('ALL', this)">All Subjects</button>
+      {% for b in branches %}
+      <button class="branch-tab" data-branch="{{ b.branch_code }}" onclick="setBranch('{{ b.branch_code }}', this)">{{ b.branch_code }}</button>
+      {% endfor %}
+    </div>
+
+    <label style="font-weight:600;font-size:.95rem;display:block;margin-bottom:10px;">Select Subject</label>
+    <div class="search-select-wrap" id="search-select-wrap">
+      <input type="text" id="subj-search-input" placeholder="🔍 Search by name or code..." autocomplete="off"
+             onfocus="openDrop()" oninput="filterDrop(this.value)">
+      <div id="subj-dropdown">
+        {% for s in subjects %}
+        <div class="subj-opt" data-code="{{ s.subject_code }}" data-name="{{ s.subject_name }}"
+             data-label="{{ s.subject_code }} — {{ s.subject_name }}"
+             data-branches="{{ s.branch_codes() | join(',') }}"
+             onclick="selectSubject(this)">
+          <span style="color:#1a56db;font-weight:600;">{{ s.subject_code }}</span> — {{ s.subject_name }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div id="loading-msg">⏳ Loading...</div>
+    <div id="error-msg"></div>
+    <p class="hint">Filter by branch, type to search, then click a subject.</p>
+  </div>
+
+  <div class="section-card" id="copo-section">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div id="subj-title-area"></div>
+      <span class="dirty-indicator" id="dirty-indicator">● Unsaved changes</span>
+    </div>
+    <div class="grid-scroll">
+      <table class="copo-table">
+        <thead>
+          <tr>
+            <th class="co-col">CO</th>
+            <th class="stmt-col">CO Statement</th>
+            <th>PO1</th><th>PO2</th><th>PO3</th><th>PO4</th><th>PO5</th><th>PO6</th>
+            <th>PO7</th><th>PO8</th><th>PO9</th><th>PO10</th><th>PO11</th><th>PO12</th>
+            <th>PSO1</th><th>PSO2</th>
+            <th class="avg-col">CO AVG</th>
+          </tr>
+        </thead>
+        <tbody id="copo-body"></tbody>
+        <tfoot id="copo-foot"></tfoot>
+      </table>
+    </div>
+
+    <div class="legend">
+      <span style="font-weight:600;">Level:</span>
+      <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:1px solid #16a34a;"></div>3 — High</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fef9c3;border:1px solid #ca8a04;"></div>2 — Medium</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:1px solid #dc2626;"></div>1 — Low</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f9fafb;border:1px solid #d1d5db;"></div>— No mapping</div>
+      <span style="color:#9ca3af;margin-left:4px;">Click a cell → type 1, 2, 3 or -</span>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-save" onclick="saveGrid()">💾 Save to DB</button>
+      <button class="btn btn-primary" onclick="exportDoc('word')">⬇ Export Word</button>
+      <button class="btn btn-danger" onclick="exportDoc('pdf')">⬇ Export PDF</button>
+      <button class="btn btn-outline" onclick="resetGrid()">↺ Reset</button>
+      <span id="save-msg"></span>
+      <span id="export-msg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const PO_COLS = ['PO1','PO2','PO3','PO4','PO5','PO6','PO7','PO8','PO9','PO10','PO11','PO12','PSO1','PSO2'];
+let gridData = {}, originalData = {}, currentCOs = [];
+let currentCode = '', currentName = '';
+let isDirty = false;
+let currentBranch = 'ALL';
+
+// ── Branch filter ──
+function setBranch(branch, btn) {
+  currentBranch = branch;
+  document.querySelectorAll('.branch-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('subj-search-input').value = '';
+  filterDrop('');
+}
+
+// ── Searchable dropdown ──
+function openDrop() {
+  filterDrop(document.getElementById('subj-search-input').value);
+  document.getElementById('subj-dropdown').classList.add('open');
+}
+function filterDrop(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.subj-opt').forEach(el => {
+    const matchText = !q || el.dataset.label.toLowerCase().includes(q);
+    const matchBranch = currentBranch === 'ALL' || (el.dataset.branches || '').split(',').includes(currentBranch);
+    el.classList.toggle('hidden', !(matchText && matchBranch));
+  });
+  document.getElementById('subj-dropdown').classList.add('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-select-wrap'))
+    document.getElementById('subj-dropdown').classList.remove('open');
+});
+
+function selectSubject(el) {
+  if (isDirty && !confirm('You have unsaved changes. Discard?')) return;
+  currentCode = el.dataset.code;
+  currentName = el.dataset.name;
+  document.getElementById('subj-search-input').value = el.dataset.label;
+  document.getElementById('subj-dropdown').classList.remove('open');
+  loadGrid(currentCode);
+}
+
+// ── Load grid ──
+async function loadGrid(code) {
+  document.getElementById('loading-msg').style.display = 'block';
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('copo-section').style.display = 'none';
+  try {
+    const res = await fetch(`/co-po/data/${code}`);
+    const data = await res.json();
+    document.getElementById('loading-msg').style.display = 'none';
+    if (!data.success) { showErr(data.error); return; }
+    gridData = JSON.parse(JSON.stringify(data.grid));
+    originalData = JSON.parse(JSON.stringify(data.grid));
+    currentCOs = data.cos;
+    currentName = data.subject_name;
+    setDirty(false);
+    document.getElementById('subj-title-area').innerHTML =
+      `<div class="subject-title">${data.subject_name}</div><span class="subject-code-badge">${code}</span>`;
+    renderGrid(data.cos);
+    document.getElementById('copo-section').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading-msg').style.display = 'none';
+    showErr('Failed to load. Check console.'); console.error(e);
+  }
+}
+function showErr(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = '⚠ ' + msg; el.style.display = 'block';
+}
+function setDirty(v) {
+  isDirty = v;
+  document.getElementById('dirty-indicator').classList.toggle('show', v);
+}
+
+// ── Render ──
+function cellClass(val) {
+  if (val === '3') return 'val-3';
+  if (val === '2') return 'val-2';
+  if (val === '1') return 'val-1';
+  return 'val-dash';
+}
+function renderGrid(cos) {
+  const tbody = document.getElementById('copo-body');
+  tbody.innerHTML = '';
+  cos.forEach(co => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="co-label">${co.co_number}</td><td class="stmt-cell">${co.statement}</td>`;
+    PO_COLS.forEach(po => {
+      const val = (gridData[co.co_number] || {})[po] || '-';
+      const td = document.createElement('td');
+      td.className = 'po-cell ' + cellClass(val);
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.maxLength = 1; inp.value = val;
+      inp.dataset.co = co.co_number; inp.dataset.po = po;
+      inp.addEventListener('change', onCellChange);
+      inp.addEventListener('focus', e => e.target.select());
+      td.appendChild(inp); tr.appendChild(td);
+    });
+    const avgTd = document.createElement('td');
+    avgTd.className = 'co-avg-cell'; avgTd.dataset.co = co.co_number;
+    avgTd.textContent = co.co_avg != null ? co.co_avg : computeCoAvg(co.co_number);
+    tr.appendChild(avgTd);
+    tbody.appendChild(tr);
+  });
+  renderAvgRow();
+}
+function computeCoAvg(coNum) {
+  const vals = PO_COLS.map(po => {
+    const v = (gridData[coNum] || {})[po];
+    return v && v !== '-' ? parseFloat(v) : null;
+  }).filter(v => v !== null);
+  return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : '-';
+}
+function onCellChange(e) {
+  let v = e.target.value.trim();
+  if (!['1','2','3','-'].includes(v)) v = '-';
+  e.target.value = v;
+  const co = e.target.dataset.co, po = e.target.dataset.po;
+  if (!gridData[co]) gridData[co] = {};
+  gridData[co][po] = v;
+  e.target.closest('td').className = 'po-cell ' + cellClass(v);
+  const avgCell = document.querySelector(`td.co-avg-cell[data-co="${co}"]`);
+  if (avgCell) avgCell.textContent = computeCoAvg(co);
+  renderAvgRow();
+  setDirty(true);
+}
+function renderAvgRow() {
+  const tfoot = document.getElementById('copo-foot');
+  tfoot.innerHTML = '';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="co-label" style="font-size:.74rem;color:#888;">AVG</td><td class="stmt-cell" style="color:#aaa;font-size:.74rem;font-style:italic;">Average Mapping Level</td>`;
+  let allAvgs = [];
+  PO_COLS.forEach(po => {
+    const vals = Object.keys(gridData).map(co => {
+      const v = (gridData[co]||{})[po];
+      return v && v !== '-' ? parseFloat(v) : null;
+    }).filter(v => v !== null);
+    const avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    const td = document.createElement('td');
+    td.className = 'po-avg-cell';
+    td.textContent = avg != null ? avg.toFixed(2) : '-';
+    if (avg != null) allAvgs.push(avg);
+    tr.appendChild(td);
+  });
+  const overallTd = document.createElement('td');
+  overallTd.className = 'po-avg-cell'; overallTd.style.background = '#ede9fe';
+  overallTd.textContent = allAvgs.length ? (allAvgs.reduce((a,b)=>a+b,0)/allAvgs.length).toFixed(2) : '-';
+  tr.appendChild(overallTd);
+  tfoot.appendChild(tr);
+}
+
+// ── Save to DB ──
+async function saveGrid() {
+  const msg = document.getElementById('save-msg');
+  msg.textContent = '⏳ Saving…'; msg.className = '';
+  const rows = [...document.querySelectorAll('#copo-body tr')].map(tr => {
+    const co = tr.querySelector('.co-label').textContent;
+    const pos = {};
+    tr.querySelectorAll('.po-cell input').forEach(inp => { pos[inp.dataset.po] = inp.value; });
+    return { co, pos };
+  });
+  try {
+    const res = await fetch('/co-po/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+      body: JSON.stringify({ subject_code: currentCode, rows })
+    });
+    const data = await res.json();
+    if (data.success) {
+      msg.textContent = `✓ Saved ${data.updated} COs`; msg.className = 'ok';
+      originalData = JSON.parse(JSON.stringify(gridData));
+      setDirty(false);
+    } else {
+      msg.textContent = '⚠ ' + data.error; msg.className = 'err';
+    }
+    setTimeout(() => msg.textContent = '', 4000);
+  } catch(e) { msg.textContent = '⚠ Save failed'; msg.className = 'err'; console.error(e); }
+}
+
+function resetGrid() {
+  if (!confirm('Reset to last saved values?')) return;
+  gridData = JSON.parse(JSON.stringify(originalData));
+  document.querySelectorAll('#copo-body tr').forEach(tr => {
+    const co = tr.querySelector('.co-label').textContent;
+    tr.querySelectorAll('.po-cell').forEach((td, i) => {
+      const po = PO_COLS[i], val = (originalData[co]||{})[po] || '-';
+      td.querySelector('input').value = val;
+      td.className = 'po-cell ' + cellClass(val);
+    });
+    const avgCell = tr.querySelector('.co-avg-cell');
+    if (avgCell) avgCell.textContent = computeCoAvg(co);
+  });
+  renderAvgRow(); setDirty(false);
+}
+
+async function exportDoc(format) {
+  const msg = document.getElementById('export-msg');
+  msg.textContent = '⏳ Generating…';
+  const rows = [...document.querySelectorAll('#copo-body tr')].map(tr => {
+    const co = tr.querySelector('.co-label').textContent;
+    const stmt = tr.querySelector('.stmt-cell').textContent;
+    const pos = {};
+    tr.querySelectorAll('.po-cell input').forEach(inp => { pos[inp.dataset.po] = inp.value; });
+    const co_avg = tr.querySelector('.co-avg-cell')?.textContent || '-';
+    return { co, stmt, pos, co_avg };
+  });
+  try {
+    const res = await fetch('/co-po/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+      body: JSON.stringify({ subject_code: currentCode, subject_name: currentName, rows, format })
+    });
+    if (!res.ok) { msg.textContent = '⚠ Export failed.'; return; }
+    const blob = await res.blob();
+    const ext = format === 'word' ? 'docx' : 'pdf';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `CO_PO_${currentCode}.${ext}`; a.click();
+    msg.textContent = '✓ Downloaded!';
+    setTimeout(() => msg.textContent = '', 3000);
+  } catch(e) { msg.textContent = '⚠ Export failed.'; console.error(e); }
+}
+
+function getCsrf() {
+  const m = document.cookie.match(/csrf_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+window.addEventListener('beforeunload', e => {
+  if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

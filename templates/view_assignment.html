@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Assignment {{ ga.assignment_number }} — {{ ga.subject.subject_name }}{% endblock %}
+
+{% block content %}
+<style>
+.container { max-width: 900px; margin: 30px auto; padding: 0 16px; }
+.card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); padding: 28px; margin-bottom: 24px; }
+.co-table, .q-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.co-table th, .co-table td, .q-table th, .q-table td { border: 1px solid #ddd; padding: 8px 10px; }
+.co-table th, .q-table th { background: #2c3e50; color: #fff; }
+.q-table tr:nth-child(even) td { background: #f9f9f9; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .78rem; font-weight: 700; }
+.badge-type { background: #d5f5e3; color: #1e8449; }
+.badge-co { background: #d6eaf8; color: #1a5276; }
+.btn { padding: 9px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+.btn-success { background: #27ae60; color: #fff; }
+.btn-success:hover { background: #219a52; }
+</style>
+
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div>
+      <h1 style="margin:0;">Assignment {{ ga.assignment_number }}</h1>
+      <p style="color:#666;margin:4px 0 0;">{{ ga.subject.subject_name }} ({{ ga.subject.subject_code }}) &middot; {{ ga.question_count }} questions</p>
+    </div>
+    <a href="{{ url_for('export_assignment_pdf', assignment_id=ga.id) }}" class="btn btn-success">Download PDF</a>
+  </div>
+
+  {% if course_outcomes %}
+  <div class="card">
+    <h2 style="margin-top:0;">Course Outcomes</h2>
+    <table class="co-table">
+      <thead><tr><th style="width:60px;">CO</th><th>Statement</th></tr></thead>
+      <tbody>
+        {% for co in course_outcomes %}
+        <tr><td><b>{{ co.co_number }}</b></td><td>{{ co.statement }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2 style="margin-top:0;">Questions</h2>
+    <table class="q-table">
+      <thead>
+        <tr><th>#</th><th>Unit</th><th>Question</th><th>Type</th><th>CO</th><th>Marks</th></tr>
+      </thead>
+      <tbody>
+        {% for q in questions %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ q.unit.unit_number if q.unit else '' }}</td>
+          <td>{{ q.question_text }}</td>
+          <td><span class="badge badge-type">{{ q.assignment_type.replace('_',' ').title() }}</span></td>
+          <td><span class="badge badge-co">{{ q.co_mapping or '' }}</span></td>
+          <td>{{ q.marks }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p style="color:#888;font-size:.85rem;">Generated: {{ ga.generated_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+</div>
+{% endblock %}

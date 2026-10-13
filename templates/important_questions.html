@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+
+  <div class="page-header">
+    <h1>Important Questions</h1>
+    <p>Questions ranked by how often they've appeared in generated exam papers.</p>
+  </div>
+
+  <div class="card search-card">
+    <label class="field-label">Search Subject</label>
+    <div style="position:relative; margin-top:6px;">
+      <input type="text" id="subject_search" placeholder="Type a subject name or code…" autofocus class="field-input search-input">
+      <div id="search-results" class="dropdown-results"></div>
+    </div>
+  </div>
+
+  <div id="selected-subject-bar" class="selected-bar" style="display:none;">
+    <span id="selected-subject-label" class="selected-label"></span>
+    <button id="change-subject-btn" type="button" class="change-btn">Change subject</button>
+  </div>
+
+  <div id="controls" class="controls-bar" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <label class="field-label" style="margin:0;">Show top</label>
+      <select id="limit-select" class="field-select" style="width:auto; min-width:150px;">
+        <option value="">All</option>
+        <option value="3">Top 3 per unit</option>
+        <option value="5" selected>Top 5 per unit</option>
+        <option value="10">Top 10 per unit</option>
+        <option value="20">Top 20 per unit</option>
+        <option value="25">Top 25 per unit</option>
+      </select>
+      <label class="field-label" style="margin:0;">Unit</label>
+      <select id="unit-filter" class="field-select" style="width:auto; min-width:160px;">
+        <option value="">All Units</option>
+      </select>
+      <label class="field-label" style="margin:0;">Type</label>
+      <select id="type-filter" class="field-select" style="width:auto; min-width:160px;">
+        <option value="subjective">Subjective (Part B)</option>
+        <option value="objective">Objective (MCQ + FIB)</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button id="select-all-btn" type="button" class="btn-outline">Select All</button>
+      <button id="clear-selection-btn" type="button" class="btn-outline">Clear</button>
+    </div>
+  </div>
+
+  <div id="questions-container" style="margin-top:8px;"></div>
+
+  <div id="export-bar" class="export-bar" style="display:none;">
+    <span id="selection-count" class="sel-count">0 selected</span>
+    <button id="export-btn" type="button" class="btn-export">⬇ Export Selected as PDF</button>
+    <span id="export-status" class="export-status"></span>
+  </div>
+
+</div>
+
+<style>
+.page-wrapper { max-width: 820px; margin: 0 auto; padding: 36px 24px 100px; }
+.page-header { margin-bottom: 24px; }
+.page-header h1 { margin: 0 0 6px; font-size: 1.7rem; color: #1a2530; }
+.page-header p { margin: 0; color: #7f8c8d; }
+
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:24px 28px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+.search-card { margin-bottom: 16px; }
+
+.field-label { font-weight:600; font-size:0.88rem; color:#2c3e50; }
+.field-input, .field-select {
+  padding:10px 14px; border:1px solid #dde3ec; border-radius:8px;
+  font-size:0.92rem; color:#2c3e50; background:#fff;
+  transition:border-color 0.18s, box-shadow 0.18s;
+  width:100%; box-sizing:border-box;
+}
+.field-input:focus, .field-select:focus {
+  outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.12);
+}
+.search-input { padding-left:38px; }
+.search-card > div { position:relative; }
+.search-card > div::before {
+  content:'🔍'; position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  font-size:0.9rem; pointer-events:none;
+}
+
+.dropdown-results {
+  position:absolute; z-index:50; top:calc(100% + 4px); left:0; right:0;
+  background:#fff; border:1px solid #dde3ec; border-radius:8px;
+  box-shadow:0 6px 20px rgba(0,0,0,0.1); max-height:240px; overflow-y:auto; display:none;
+}
+.dropdown-item { padding:10px 14px; cursor:pointer; border-bottom:1px solid #f1f2f6; font-size:0.9rem; }
+.dropdown-item:last-child { border-bottom:none; }
+.dropdown-item:hover { background:#f0f7fd; }
+
+.selected-bar {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:#eef6fd; border:1px solid #b8d9f5; border-radius:10px;
+  padding:12px 20px; margin-bottom:12px;
+}
+.selected-label { font-weight:600; color:#1a6fa8; }
+.change-btn { background:none; border:none; color:#3498db; cursor:pointer; font-size:0.88rem; text-decoration:underline; padding:0; }
+
+.controls-bar {
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+  padding:14px 20px; margin-bottom:16px;
+}
+.btn-outline { padding:7px 16px; background:#fff; border:1px solid #dde3ec; border-radius:7px; font-size:0.88rem; cursor:pointer; color:#2c3e50; transition:border-color 0.15s; }
+.btn-outline:hover { border-color:#3498db; color:#3498db; }
+
+.unit-section { margin-bottom:20px; }
+.unit-heading {
+  font-size:1rem; font-weight:700; color:#2c3e50;
+  border-bottom:2px solid #e2e8f0; padding-bottom:8px; margin:0 0 12px;
+}
+.q-row {
+  display:flex; gap:12px; padding:10px 14px;
+  background:#fff; border:1px solid #e8ecf2; border-radius:8px;
+  cursor:pointer; transition:border-color 0.15s, background 0.15s;
+  margin-bottom:8px; align-items:flex-start;
+}
+.q-row:hover { border-color:#b8d9f5; background:#f7fbff; }
+.q-row:has(input:checked) { border-color:#3498db; background:#f0f7fd; }
+.q-row input[type="checkbox"] { margin-top:3px; flex-shrink:0; accent-color:#3498db; }
+.q-text { color:#2c3e50; font-size:0.92rem; line-height:1.5; margin:0 0 3px; }
+.q-meta { color:#95a5a6; font-size:0.8rem; }
+.pill-obj { display:inline-block; background:#fef3e2; color:#b7770d; border-radius:10px; padding:1px 8px; font-size:0.72rem; font-weight:600; margin-left:4px; }
+
+.export-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  background:#fff; border-top:1px solid #e2e8f0;
+  box-shadow:0 -4px 16px rgba(0,0,0,0.08);
+  padding:14px 32px;
+  display:flex; align-items:center; gap:16px; z-index:100;
+}
+.sel-count { color:#7f8c8d; font-size:0.9rem; }
+.btn-export { padding:10px 24px; background:#27ae60; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; transition:background 0.18s; }
+.btn-export:hover { background:#219a52; }
+.btn-export:disabled { background:#a8d4bc; cursor:not-allowed; }
+.export-status { color:#7f8c8d; font-size:0.88rem; }
+</style>
+
+<script>
+const searchInput = document.getElementById('subject_search');
+const searchResults = document.getElementById('search-results');
+const selectedBar = document.getElementById('selected-subject-bar');
+const selectedLabel = document.getElementById('selected-subject-label');
+const changeBtn = document.getElementById('change-subject-btn');
+const controlsBox = document.getElementById('controls');
+const limitSelect = document.getElementById('limit-select');
+const unitFilter = document.getElementById('unit-filter');
+const typeFilter = document.getElementById('type-filter');
+const selectAllBtn = document.getElementById('select-all-btn');
+const clearBtn = document.getElementById('clear-selection-btn');
+const container = document.getElementById('questions-container');
+const exportBar = document.getElementById('export-bar');
+const selCount = document.getElementById('selection-count');
+const exportBtn = document.getElementById('export-btn');
+const exportStatus = document.getElementById('export-status');
+let currentSubjectCode = null;
+let subjectUnits = [];
+
+function subjectLabel(s) { return `${s.subject_code} — ${s.subject_name}` + (s.elective_group ? `  [${s.elective_group}]` : ''); }
+
+function updateCount() {
+    const n = container.querySelectorAll('.q-checkbox:checked').length;
+    selCount.textContent = `${n} selected`;
+    exportBar.style.display = n > 0 ? 'flex' : 'none';
+}
+
+async function loadUnitsForSubject(subjectCode) {
+    const res = await fetch(`/api/units?subject_code=${encodeURIComponent(subjectCode)}`);
+    const units = await res.json();
+    subjectUnits = units;
+    unitFilter.innerHTML = '<option value="">All Units</option>';
+    units.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `Unit ${u.unit_number}: ${u.unit_name}`;
+        unitFilter.appendChild(opt);
+    });
+}
+
+async function loadQuestions() {
+    if (!currentSubjectCode) return;
+    container.innerHTML = '<p style="color:#95a5a6; padding:16px 0;">Loading questions…</p>';
+    const params = new URLSearchParams({ subject_code: currentSubjectCode });
+    if (limitSelect.value) params.set('limit_per_unit', limitSelect.value);
+    if (unitFilter.value) params.set('unit_id', unitFilter.value);
+
+    const qType = typeFilter.value;
+    const res = await fetch(`/api/important-questions?${params}`);
+    const data = await res.json();
+    if (!data.success) { container.innerHTML = `<div class="card" style="color:#e74c3c;">${data.error || 'Could not load.'}</div>`; return; }
+
+    const hasSubj = data.units.some(u => u.part_a.length || u.groups.length);
+    const hasObj = data.units.some(u => (u.mcq || []).length || (u.fib || []).length);
+
+    if (!hasSubj && !hasObj) {
+        container.innerHTML = '<div class="card" style="color:#e67e22;">No questions found for this subject yet.</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    data.units.forEach(unit => {
+        const sec = document.createElement('div'); sec.className = 'unit-section';
+        const h = document.createElement('h4'); h.className = 'unit-heading'; h.textContent = unit.unit_name;
+        sec.appendChild(h);
+
+        let hasAny = false;
+
+        if (qType !== 'objective') {
+            unit.part_a.forEach(q => { sec.appendChild(makeRow('part_a', q.id, q.text, `Part A · ${q.bloom} · used ${q.usage_count}×`)); hasAny=true; });
+            unit.groups.forEach(g => {
+                const text = g.parts.map(p => (p.label ? `(${p.label}) ` : '') + p.text).join('  ');
+                sec.appendChild(makeRow('group', g.group_id, text, `Part B ${g.question_type} · ${g.total_marks} marks · used ${g.usage_count}×`));
+                hasAny=true;
+            });
+        }
+
+        if (qType !== 'subjective') {
+            (unit.mcq || []).forEach(q => {
+                sec.appendChild(makeRow('mcq', q.id, q.text, `MCQ · ${q.bloom} · used ${q.usage_count}× <span class="pill-obj">Objective</span>`));
+                hasAny=true;
+            });
+            (unit.fib || []).forEach(q => {
+                sec.appendChild(makeRow('fib', q.id, q.text, `FIB · ${q.bloom} · used ${q.usage_count}× <span class="pill-obj">Objective</span>`));
+                hasAny=true;
+            });
+        }
+
+        if (hasAny) container.appendChild(sec);
+    });
+    updateCount();
+}
+
+function makeRow(type, id, text, meta) {
+    const row = document.createElement('label'); row.className = 'q-row';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'q-checkbox'; cb.dataset.type = type; cb.dataset.id = id;
+    const info = document.createElement('span');
+    info.innerHTML = `<div class="q-text">${text}</div><div class="q-meta">${meta}</div>`;
+    row.appendChild(cb); row.appendChild(info);
+    return row;
+}
+
+container.addEventListener('change', e => { if (e.target.classList.contains('q-checkbox')) updateCount(); });
+selectAllBtn.addEventListener('click', () => { container.querySelectorAll('.q-checkbox').forEach(c => c.checked = true); updateCount(); });
+clearBtn.addEventListener('click', () => { container.querySelectorAll('.q-checkbox').forEach(c => c.checked = false); updateCount(); });
+limitSelect.addEventListener('change', loadQuestions);
+unitFilter.addEventListener('change', loadQuestions);
+typeFilter.addEventListener('change', loadQuestions);
+
+function selectSubject(s) {
+    currentSubjectCode = s.subject_code;
+    selectedLabel.textContent = subjectLabel(s);
+    selectedBar.style.display = 'flex';
+    controlsBox.style.display = 'flex';
+    searchInput.value = '';
+    searchInput.closest('.search-card').style.display = 'none';
+    searchResults.style.display = 'none';
+    loadUnitsForSubject(s.subject_code);
+    loadQuestions();
+}
+
+changeBtn.addEventListener('click', () => {
+    currentSubjectCode = null;
+    selectedBar.style.display = 'none';
+    controlsBox.style.display = 'none';
+    container.innerHTML = '';
+    exportBar.style.display = 'none';
+    searchInput.closest('.search-card').style.display = 'block';
+    searchInput.focus();
+});
+
+let debounce;
+searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    const q = searchInput.value.trim();
+    if (!q) { searchResults.style.display = 'none'; return; }
+    debounce = setTimeout(async () => {
+        const res = await fetch(`/api/search-subjects?q=${encodeURIComponent(q)}`);
+        const items = await res.json();
+        searchResults.innerHTML = '';
+        if (!items.length) { searchResults.innerHTML = '<div class="dropdown-item" style="color:#95a5a6;">No matches.</div>'; }
+        else items.forEach(s => {
+            const d = document.createElement('div'); d.className = 'dropdown-item';
+            d.textContent = `${subjectLabel(s)}  (${s.branch_code}, ${s.term})`;
+            d.addEventListener('click', () => selectSubject(s));
+            searchResults.appendChild(d);
+        });
+        searchResults.style.display = 'block';
+    }, 250);
+});
+document.addEventListener('click', e => { if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none'; });
+
+exportBtn.addEventListener('click', async () => {
+    const partAIds = Array.from(container.querySelectorAll('.q-checkbox[data-type="part_a"]:checked')).map(c => +c.dataset.id);
+    const groupIds = Array.from(container.querySelectorAll('.q-checkbox[data-type="group"]:checked')).map(c => +c.dataset.id);
+    if (!partAIds.length && !groupIds.length) { exportStatus.textContent = 'Select at least one question.'; return; }
+    exportStatus.textContent = 'Preparing PDF…'; exportBtn.disabled = true;
+    try {
+        const res = await fetch('/important-questions/export-pdf', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ subject_code: currentSubjectCode, part_a_ids: partAIds, group_ids: groupIds })
+        });
+        if (!res.ok) { const err = await res.json().catch(()=>({})); exportStatus.textContent = err.error || 'Export failed.'; return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `important_questions_${currentSubjectCode}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        exportStatus.textContent = 'Downloaded.';
+    } finally { exportBtn.disabled = false; }
+});
+</script>
+{% endblock %}
